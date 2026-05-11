@@ -30,11 +30,13 @@ onchainos market portfolio-overview \
 onchainos market portfolio-dex-history \
   --address <wallet>*  \
   --chain <chain>*     \
-  --begin <ms>         # start timestamp (milliseconds)
-  --end <ms>           # end timestamp (milliseconds)
-  --limit <n>          # records per page (default: 100, max: 100)
+  --begin <ms>*        # start timestamp (milliseconds) — REQUIRED
+  --end <ms>*          # end timestamp (milliseconds) — REQUIRED
   --cursor <cursor>    # pagination cursor from previous response
 ```
+**Note:** `--begin` and `--end` are required. Compute as Unix ms:
+- `end` = `Date.now()` (current time in ms)
+- `begin` = end − (days × 86400 × 1000), e.g. 30 days = end − 2592000000
 **Returns:** paginated list of DEX trades — `txHash`, `tokenSymbol`, `side` (buy/sell), `amountUsd`, `pnl`, `timestamp`, `cursor`
 
 Paginate by passing last item's `cursor` as `--cursor` on the next call.
@@ -105,9 +107,9 @@ onchainos tracker activities \
 onchainos leaderboard list \
   --chain <chain>*         \
   --time-frame <1|2|3|4|5> \  # 1=1D 2=3D 3=7D 4=30D 5=90D
-  --sort-by <1|2|3|4|5>    \  # 1=PnL 2=winRate 3=txCount 4=volume 5=ROI
-  --limit <n>                  # max 20
+  --sort-by <1|2|3|4|5>       # 1=PnL 2=winRate 3=txCount 4=volume 5=ROI
 ```
+**Note:** No `--limit` flag — the CLI returns the default result set.
 Use to benchmark analyzed wallet against top traders on the same chain.
 
 ---

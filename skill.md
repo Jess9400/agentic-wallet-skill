@@ -4,7 +4,7 @@ description: "AI-powered on-chain wallet strategy analysis, mutation, and autono
 license: MIT
 metadata:
   author: jessicanascimento2394@gmail.com
-  version: "1.1.0"
+  version: "1.2.0"
   homepage: "https://web3.okx.com/boost/trading-competition/agentic-trading"
 ---
 
@@ -12,7 +12,7 @@ metadata:
 
 Turn any on-chain wallet into a machine-readable trading strategy — then reverse, enhance, or hybridize it.
 
-**Seven modes:**
+**Eight modes:**
 
 | Mode | Trigger phrases | What it does |
 |---|---|---|
@@ -23,6 +23,7 @@ Turn any on-chain wallet into a machine-readable trading strategy — then rever
 | `combine` | "combine", "merge wallets", "hybridize" | Merges 2–3 wallets into a synthetic composite strategy |
 | `discover` | "find best trader", "top wallets", "who should I copy" | Auto-ranks leaderboard traders by edge quality and recommends the best |
 | `auto-copy` | "start copying", "auto-execute", "mirror automatically" | Fully autonomous: monitor → security scan → execute → report |
+| `yield` | "earn yield", "idle capital", "find best APY", "deploy unused funds" | Deploys idle wallet capital into best risk-adjusted DeFi yield products |
 
 ---
 
@@ -53,6 +54,7 @@ Before any command, identify the user's intent:
 | "combine", "merge", "hybridize", 2+ wallets given | → **combine** |
 | "find best", "discover", "top traders", "who should I copy", "leaderboard" | → **discover** |
 | "start copying", "auto-copy", "auto-execute", "mirror automatically", "set daily limit" | → **auto-copy** |
+| "earn yield", "idle capital", "find best APY", "deploy unused", "earn while waiting" | → **yield** |
 
 If mode is ambiguous with a single wallet given, default to **analyze** and ask if they also want mutation options after the report.
 
@@ -77,7 +79,9 @@ For each wallet address provided, fetch all of the following:
 onchainos market portfolio-overview --address <wallet> --chain <chain> --time-frame 3
 
 # DEX trade history — up to 1000 records (paginate with --cursor if needed)
-onchainos market portfolio-dex-history --address <wallet> --chain <chain>
+# --begin and --end are REQUIRED, in milliseconds
+# 30-day window: begin = (now - 30*86400)*1000, end = now*1000
+onchainos market portfolio-dex-history --address <wallet> --chain <chain> --begin <beginMs> --end <endMs>
 
 # Recent PnL by token — last 100 positions
 onchainos market portfolio-recent-pnl --address <wallet> --chain <chain>
@@ -365,6 +369,7 @@ After every mode's output, always append:
 - 🔁 Combine this wallet with another for a composite strategy
 - 🏆 Discover the best traders on the leaderboard to copy
 - 🤖 Start autonomous copy-trading with a daily risk limit
+- 💰 Deploy idle capital into the best DeFi yield products
 - 💡 Explain any part of the strategy in more detail
 ```
 
@@ -384,14 +389,14 @@ Run all three leaderboard queries in parallel to get a complete picture across r
 # Confirm chain is supported
 onchainos leaderboard supported-chains
 
-# Fetch top 20 by win rate (7D)
-onchainos leaderboard list --chain <chain> --time-frame 3 --sort-by 2 --limit 20
+# Fetch top traders by win rate (7D) — no --limit flag, returns default list
+onchainos leaderboard list --chain <chain> --time-frame 3 --sort-by 2
 
-# Fetch top 20 by realized PnL (7D)
-onchainos leaderboard list --chain <chain> --time-frame 3 --sort-by 1 --limit 20
+# Fetch top traders by realized PnL (7D)
+onchainos leaderboard list --chain <chain> --time-frame 3 --sort-by 1
 
-# Fetch top 20 by ROI (7D)
-onchainos leaderboard list --chain <chain> --time-frame 3 --sort-by 5 --limit 20
+# Fetch top traders by ROI (7D)
+onchainos leaderboard list --chain <chain> --time-frame 3 --sort-by 5
 ```
 
 `--sort-by` values: `1`=PnL, `2`=win rate, `3`=tx count, `4`=volume, `5`=ROI
@@ -560,7 +565,168 @@ Stop the autonomous loop when:
 
 ---
 
-## Step 8 — Risk-Gated Execution Framework
+## Step 8 — Yield Mode (yield mode)
+
+Finds idle capital in the wallet and automatically deploys it into the best risk-adjusted DeFi yield product — so capital works between copy-trades instead of sitting dormant.
+
+**Triggers:** "put idle capital to work", "earn yield on unused funds", "find best APY", "deploy idle tokens", "earn while I wait", "yield on my USDC"
+
+### 8a. Identify idle capital
+
+```bash
+# Fetch current holdings
+onchainos portfolio all-balances --address <wallet> --chains <chain>
+```
+
+Idle tokens = tokens held in wallet that are:
+- NOT currently deployed in a copy-trade position (cross-reference auto-copy active positions)
+- Value ≥ $50 (below this, gas cost exceeds yield benefit)
+- Are yield-eligible: stablecoins (USDC, USDT, DAI), ETH, SOL, BTC, or major L1 tokens
+
+Display to user:
+
+```
+## Idle Capital Detected
+
+| Token | Amount | Value (USD) | Status |
+|-------|--------|-------------|--------|
+| {token} | {amount} | ${value} | Idle — not deployed |
+| ... | ... | ... | ... |
+
+**Total idle:** ${totalIdle}
+
+Searching for best yield opportunities...
+```
+
+### 8b. Search and rank DeFi products
+
+For each idle token, search in parallel:
+
+```bash
+# Find top yield products for each idle token
+onchainos defi search --token <tokenSymbol> --chain <chain>
+
+# Check chain support if uncertain
+onchainos defi support-chains
+```
+
+For the top 3 results per token, fetch APY stability data:
+
+```bash
+# 30-day APY trend — validates that yield is stable, not a spike
+onchainos defi rate-chart --investment-id <id> --time-range MONTH
+```
+
+**Composite yield score formula:**
+
+```
+yieldScore = APY × stabilityFactor × liquidityFactor
+
+stabilityFactor = 1 - (APY_stddev / APY_mean)   # lower variance = more stable = higher score
+liquidityFactor = min(1, TVL / 1_000_000)        # TVL < $1M penalised; TVL > $1M = full score
+```
+
+Rank all products by `yieldScore` descending.
+
+### 8c. Present ranked options
+
+```
+## Best Yield Opportunities for Your Idle Capital
+
+### {tokenSymbol} — ${idleValue} available
+
+| Rank | Protocol | Product | APY | 30D Avg APY | TVL | Stability | Yield Score |
+|------|----------|---------|-----|-------------|-----|-----------|-------------|
+| 1 | {protocol1} | {product1} | {apy1}% | {avg1}% | ${tvl1} | {stab1} | {score1} |
+| 2 | {protocol2} | {product2} | {apy2}% | {avg2}% | ${tvl2} | {stab2} | {score2} |
+| 3 | {protocol3} | {product3} | {apy3}% | {avg3}% | ${tvl3} | {stab3} | {score3} |
+
+**Recommended:** {protocol1} — {apy1}% APY with strong 30-day stability.
+Estimated monthly yield on ${idleValue}: **+${monthlyYield}**
+
+Deploy to recommended option, choose a different one, or skip?
+```
+
+**Field-mapping rules:**
+- `{stability}` — "High" if stddev/mean <0.2, "Medium" if 0.2–0.5, "Low/Volatile" if >0.5
+- `{monthlyYield}` = idleValue × (APY/100) / 12, rounded to 2 decimal places
+- Never show `investmentId` to the user
+
+### 8d. Execute deposit
+
+On user confirmation:
+
+```bash
+# 1. Verify balance (REQUIRED before invest)
+onchainos portfolio all-balances --address <wallet> --chains <chain>
+
+# 2. Get product detail for token decimals
+onchainos defi detail --investment-id <id>
+
+# 3. Execute deposit (CLI handles precision conversion internally)
+onchainos defi invest \
+  --investment-id <id> \
+  --address <wallet> \
+  --token <tokenSymbol> \
+  --amount <minimalUnits> \
+  --chain <chain>
+```
+
+Amount conversion: `minimalUnits = userAmount × 10^decimal` (decimal from `defi detail` → `underlyingToken[].decimal`)
+
+After deposit calldata is returned, execute via Agentic Wallet:
+
+```bash
+onchainos wallet contract-call \
+  --to <contractAddress> \
+  --chain <chain> \
+  --input-data <calldata> \
+  --amt 0
+```
+
+<NEVER>
+Never call `defi invest` before verifying wallet balance. Never skip the balance check even if the user says "just do it". A failed on-chain transaction wastes gas and degrades trust.
+</NEVER>
+
+### 8e. Post-deposit report
+
+```
+## Yield Position Opened ✓
+
+**Deployed:** ${deployedAmount} {tokenSymbol} → {protocol}
+**Expected APY:** {apy}% ({monthlyYield}/month estimated)
+**Tx hash:** {txHash}
+**Position active on:** {chain}
+
+To withdraw anytime: tell me "withdraw my {protocol} position"
+To check earnings: tell me "check my DeFi positions"
+```
+
+### 8f. Yield exit (on request)
+
+When user says "withdraw yield", "exit DeFi position", "pull my funds":
+
+```bash
+# Always fetch fresh position detail before withdrawing
+onchainos defi positions --address <wallet> --chains <chain>
+onchainos defi position-detail --address <wallet> --chain <chain> --platform-id <pid>
+
+# Full exit
+onchainos defi withdraw \
+  --investment-id <id> \
+  --address <wallet> \
+  --chain <chain> \
+  --ratio 1 \
+  --platform-id <pid>
+```
+
+<MUST>
+Always call `defi position-detail` immediately before every withdraw — never reuse stale position data from earlier in the conversation.
+</MUST>
+
+---
+
+## Step 9 — Risk-Gated Execution Framework
 
 Applied globally across all execution modes (auto-copy, and any future execution triggered by this skill).
 
