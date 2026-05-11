@@ -10,7 +10,7 @@ Built for the **OKX Agentic Wallet Trading Competition — Skill Quality Prize**
 
 Input one or more on-chain wallet addresses. The skill fetches up to 1,000 DEX trades, analyzes behavioral patterns, classifies the trader type, extracts IF-THEN strategy rules, and optionally mutates them.
 
-### Five Modes
+### Seven Modes
 
 | Mode | Trigger | Description |
 |---|---|---|
@@ -19,6 +19,8 @@ Input one or more on-chain wallet addresses. The skill fetches up to 1,000 DEX t
 | `enhance` | "improve this strategy" | Keeps core edge, reduces leverage & drawdown, adds a volatility filter |
 | `copy` | "copy-trade this wallet" | Generates entry/exit/sizing rules ready to deploy |
 | `combine` | "merge these wallets" | Weights and merges 2–3 wallets by their individual strengths |
+| `discover` | "find best trader to copy" | Auto-scans leaderboard across PnL/Win Rate/ROI, scores each wallet, recommends the top copy candidate |
+| `auto-copy` | "start copying automatically" | Fully autonomous loop: monitor → security scan → size → execute → report, with daily loss limits |
 
 ---
 
@@ -64,6 +66,29 @@ Avoid:  Meme tokens <$500K market cap
 **Enhancement** — Keeps the core edge, reduces leverage, adds a volatility filter.  
 **Copy** — Generates actionable mirror-trading rules with lag window and risk controls.  
 **Hybridization** — Merges 2–3 wallets weighted by their strongest dimension (entries from Wallet A, exits from Wallet B, sizing from Wallet C).
+
+---
+
+### Step 6 — Leaderboard Discovery (discover mode)
+Scans the leaderboard across three dimensions (PnL, Win Rate, ROI), deduplicates, and scores each wallet with a composite edge formula. Auto-analyzes the top 3 and recommends the best copy candidate — fully automated, no manual wallet input needed.
+
+### Step 7 — Autonomous Execution (auto-copy mode)
+After user confirms budget and daily loss limit, the skill enters a monitor loop:
+1. Watch target wallet via `onchainos tracker activities`
+2. On new buy detected → run full security gate (honeypot scan, liquidity check, market cap check)
+3. If all gates pass → size position (≤50% of target's buy, ≤5% of your portfolio)
+4. Execute swap via OKX DEX
+5. Report tx hash, entry price, take-profit and stop-loss levels
+6. Continue monitoring until daily limit hit, budget exhausted, or user says stop
+
+### Step 8 — Risk-Gated Execution Framework
+Every trade passes a mandatory checklist before execution:
+- Security scan (no honeypot, risk ≤ medium)
+- Daily loss limit not exceeded
+- Position size within parameters
+- Liquidity ≥ $50K, market cap ≥ $500K
+- No duplicate open position
+- Volatility circuit breaker (warns if token moved >30% in 24h)
 
 ---
 
